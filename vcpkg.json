@@ -1,0 +1,14 @@
+{
+    "name": "exo",
+    "version": "0.1.0",
+    "dependencies": [
+        "opencv4",
+        "spdlog",
+        "tomlplusplus",
+        "glm",
+        "oscpack",
+        "apriltag",
+        "eigen3"
+    ],
+    "builtin-baseline": "2cf2bcc60add50f79b2c418487d9cd1b6c7c1fec"
+}
