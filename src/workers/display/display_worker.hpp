@@ -30,6 +30,8 @@ private:
 
   std::vector<Eigen::Vector3f> m_tagObjPoints;
   double m_tagSize;
+
+  std::vector<Eigen::Vector3f> m_tagCornersBuffer;
 };
 
 } // namespace workers::display

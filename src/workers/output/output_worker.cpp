@@ -6,8 +6,8 @@
 #include "engines/nvidia/nvar_pose.hpp"
 #include "osc/osc_sender.hpp"
 
+#include <Eigen/src/Core/Map.h>
 #include <Eigen/src/Core/Matrix.h>
-#include <Eigen/src/Geometry/Transform.h>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -23,6 +23,7 @@ OutputWorker::OutputWorker(core::HybridBuffer<engines::nvidia::NvARPose> &nvARPo
 }
 
 void OutputWorker::Run(std::atomic<bool> &running) {
+
   while (running) {
     m_nvARPoseHybridBufferReadSlot = m_nvARPoseHybridBuffer.Fetch();
 
@@ -33,22 +34,14 @@ void OutputWorker::Run(std::atomic<bool> &running) {
 
     auto rawKpts = AsEigenMap(m_nvARPoseHybridBufferReadSlot->keypoints3D) * 0.001f;
 
-    auto currentPoses = m_calibrationApriltagDetector.GetEigenIsometry3fPosesAprilTag();
-    if (currentPoses && !currentPoses->empty()) {
-      Eigen::Isometry3f inversePose = currentPoses->at(0).inverse();
+    const auto &nvRot = m_nvARPoseHybridBufferReadSlot->jointAngles;
+    Eigen::Map<const Eigen::Matrix4Xf> rotMap((float *)nvRot.data(), 4, nvRot.size());
 
-      std::vector<Eigen::Vector3f> tagSpacePoints = ApplyPoseToEigen(rawKpts, inversePose);
-      std::vector<Eigen::Vector3f> unityPoints(tagSpacePoints.size());
+    m_oscSender.SendSkeleton(rawKpts, rotMap, m_nvARPoseHybridBufferReadSlot->keypointsConfidence);
 
-      for (size_t i = 0; i < tagSpacePoints.size(); i++) {
-
-        unityPoints[i].x() = tagSpacePoints[i].x();
-        unityPoints[i].y() = -tagSpacePoints[i].z();
-        unityPoints[i].z() = tagSpacePoints[i].y();
-      }
-      m_oscSender.SendJoint(AsEigenMap(unityPoints));
-    } else {
-      m_oscSender.SendJoint(rawKpts);
+    auto currentTags = m_calibrationApriltagDetector.GetEigenIsometry3fPosesAprilTag();
+    if (currentTags && !currentTags->empty()) {
+      m_oscSender.SendTags(*currentTags);
     }
   }
 }

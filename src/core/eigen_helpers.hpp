@@ -9,14 +9,17 @@
 
 namespace core {
 
-inline std::vector<Eigen::Vector3f> ApplyPoseToEigen(const Eigen::Ref<const Eigen::Matrix3Xf> &keypoints, const Eigen::Isometry3f &pose) {
-  if (keypoints.cols() == 0)
-    return {};
+inline void ApplyPoseToEigen(const Eigen::Ref<const Eigen::Matrix3Xf> &inputPoints, const Eigen::Isometry3f &pose, std::vector<Eigen::Vector3f> &outputBuffer) {
+  if (inputPoints.cols() == 0)
+    return;
 
-  std::vector<Eigen::Vector3f> transformed(keypoints.cols());
-  Eigen::Map<Eigen::Matrix3Xf>((float *)transformed.data(), 3, keypoints.cols()) = pose * keypoints;
+  if (outputBuffer.size() != inputPoints.cols()) {
+    outputBuffer.resize(inputPoints.cols());
+  }
 
-  return transformed;
+  Eigen::Map<Eigen::Matrix3Xf> outputMap((float *)outputBuffer.data(), 3, inputPoints.cols());
+
+  outputMap = pose * inputPoints;
 }
 
 inline Eigen::Map<const Eigen::Matrix3Xf> AsEigenMap(const std::vector<NvAR_Point3f> &points) {

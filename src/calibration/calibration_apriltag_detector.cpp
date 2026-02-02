@@ -21,7 +21,6 @@
 #include <opencv2/imgproc.hpp>
 #include <spdlog/spdlog.h>
 #include <tagStandard41h12.h>
-#include <utility>
 #include <vector>
 
 namespace calibration {
@@ -52,62 +51,73 @@ zarray_t *CalibrationApriltagDetector::DetectAprilTag(core::Frame *frameHybridBu
   return detections;
 }
 
-std::pair<std::shared_ptr<std::vector<cv::Mat>>, std::shared_ptr<std::vector<cv::Mat>>> CalibrationApriltagDetector::GetTvecsRvecsSolvePnP(core::Frame *frameHybridBufferPeekSlot) const {
-  if (!frameHybridBufferPeekSlot || frameHybridBufferPeekSlot->image.empty()) {
-    return m_solvePnPPIPPESquare.GetTvecsRvecs();
-  }
-
-  zarray_t *detections = DetectAprilTag(frameHybridBufferPeekSlot);
-  auto [tvecs, rvecs] = m_solvePnPPIPPESquare.GetTvecsRvecs(detections, frameHybridBufferPeekSlot);
-
-  apriltag_detections_destroy(detections);
-  return {tvecs, rvecs};
-}
-
-std::shared_ptr<std::vector<apriltag_pose_t>> CalibrationApriltagDetector::GetPosesAprilTag(core::Frame *frameHybridBufferPeekSlot) const {
-  if (!frameHybridBufferPeekSlot || frameHybridBufferPeekSlot->image.empty()) {
-    return m_apriltagEstimateTagPose.estimateTagPose();
-  }
-
-  zarray_t *detections = DetectAprilTag(frameHybridBufferPeekSlot);
-  auto poses = m_apriltagEstimateTagPose.estimateTagPose(detections, frameHybridBufferPeekSlot);
-
-  apriltag_detections_destroy(detections);
-  return poses;
-}
-
 double CalibrationApriltagDetector::GetTagSizeMeters() const {
   return m_calibrationCfg.tagSizeMeters;
 }
 
-std::shared_ptr<std::vector<Eigen::Isometry3f>> CalibrationApriltagDetector::GetEigenIsometry3fPosesAprilTag(core::Frame *frameHybridBufferPeekSlot) const {
+std::shared_ptr<std::vector<core::TagData>> CalibrationApriltagDetector::GetEigenIsometry3fPosesAprilTag(core::Frame *frameHybridBufferPeekSlot) const {
 
   if (m_calibrationToggle) {
     return nullptr;
   }
 
   if (!frameHybridBufferPeekSlot) {
-    return m_eigenIsometry3f.load(std::memory_order_acquire);
+    return m_tagDataStorage.load(std::memory_order_acquire);
   }
 
   if (frameHybridBufferPeekSlot->image.empty()) {
     spdlog::info("Invalid frame peek");
-    return m_eigenIsometry3f.load(std::memory_order_acquire);
+    return m_tagDataStorage.load(std::memory_order_acquire);
   }
 
   spdlog::info("Solver: Apriltag", m_calibrationCfg.solverId);
 
-  auto newEigenIsometry3fList = std::make_shared<std::vector<Eigen::Isometry3f>>();
+  auto newTagDataList = std::make_shared<std::vector<core::TagData>>();
 
-  if (m_calibrationCfg.solverId) {
-    auto [tvecs, rvecs] = GetTvecsRvecsSolvePnP(frameHybridBufferPeekSlot);
+  zarray_t *detections = DetectAprilTag(frameHybridBufferPeekSlot);
+  if (!detections) {
+    return m_tagDataStorage.load(std::memory_order_acquire);
+  }
+
+  int detCount = zarray_size(detections);
+
+  switch (m_calibrationCfg.solverId) {
+  case 0: {
+    auto poses = m_apriltagEstimateTagPose.estimateTagPose(detections, frameHybridBufferPeekSlot);
+    if (!poses || poses->empty()) {
+      spdlog::info("No Apriltag poses");
+      apriltag_detections_destroy(detections);
+      return m_tagDataStorage.load(std::memory_order_acquire);
+    }
+
+    for (int i = 0; i < detCount; i++) {
+      apriltag_detection_t *det;
+      zarray_get(detections, i, &det);
+
+      const auto &pose = poses->at(i);
+
+      Eigen::Isometry3f T = Eigen::Isometry3f::Identity();
+      T.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(pose.R->data).cast<float>();
+      T.translation() = Eigen::Map<const Eigen::Vector3d>(pose.t->data).cast<float>();
+
+      newTagDataList->push_back({det->id, T});
+    }
+
+    break;
+  }
+  case 1: {
+    auto [tvecs, rvecs] = m_solvePnPPIPPESquare.GetTvecsRvecs(detections, frameHybridBufferPeekSlot);
 
     if (!tvecs || !rvecs || tvecs->size() != rvecs->size() || tvecs->empty()) {
       spdlog::info("No solvePnP results");
-      return m_eigenIsometry3f.load(std::memory_order_acquire);
+      apriltag_detections_destroy(detections);
+      return m_tagDataStorage.load(std::memory_order_acquire);
     }
 
     for (size_t i = 0; i < tvecs->size(); i++) {
+      apriltag_detection_t *det;
+      zarray_get(detections, (int)i, &det);
+
       cv::Mat R;
       cv::Rodrigues(rvecs->at(i), R);
 
@@ -120,29 +130,20 @@ std::shared_ptr<std::vector<Eigen::Isometry3f>> CalibrationApriltagDetector::Get
       Eigen::Isometry3f T = Eigen::Isometry3f::Identity();
       T.linear() = eigenR;
       T.translation() = eigenT;
-      newEigenIsometry3fList->push_back(T);
+
+      newTagDataList->push_back({det->id, T});
     }
-
-  } else {
-    auto poses = GetPosesAprilTag(frameHybridBufferPeekSlot);
-    if (!poses || poses->empty()) {
-      spdlog::info("No Apriltag poses");
-      return m_eigenIsometry3f.load(std::memory_order_acquire);
-    }
-
-    for (const auto &pose : *poses) {
-
-      Eigen::Isometry3f T = Eigen::Isometry3f::Identity();
-
-      T.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(pose.R->data).cast<float>();
-      T.translation() = Eigen::Map<const Eigen::Vector3d>(pose.t->data).cast<float>();
-
-      newEigenIsometry3fList->push_back(T);
-    }
+    break;
   }
-  m_eigenIsometry3f.store(newEigenIsometry3fList, std::memory_order_release);
+  default:
+    break;
+  }
 
-  return m_eigenIsometry3f.load(std::memory_order_acquire);
+  apriltag_detections_destroy(detections);
+
+  m_tagDataStorage.store(newTagDataList, std::memory_order_release);
+
+  return m_tagDataStorage.load(std::memory_order_acquire);
 }
 
 void CalibrationApriltagDetector::ToggleCalibration() {

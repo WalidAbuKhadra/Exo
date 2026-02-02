@@ -8,8 +8,8 @@
 namespace draw {
 class DrawSkeletonPerspectiveProjection {
 public:
-  static void Draw3DInversed(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength);
+  static void Draw3D(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength);
 
-  static void Draw3DInversed(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength, const Eigen::Ref<const Eigen::Matrix3Xf> &tagKpts3D);
+  static void Draw3D(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength, const Eigen::Ref<const Eigen::Matrix3Xf> &tagKpts3D);
 };
 } // namespace draw

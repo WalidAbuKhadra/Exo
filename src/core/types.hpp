@@ -1,4 +1,5 @@
 #pragma once
+#include <Eigen/src/Geometry/Transform.h>
 #include <chrono>
 #include <cstdint>
 #include <opencv2/core/mat.hpp>
@@ -20,6 +21,11 @@ struct Frame {
 
   float sensorWidthMM = 4.8f;
   float lensFocalLengthMM = 3.67f;
+};
+
+struct TagData {
+  int id;
+  Eigen::Isometry3f transform;
 };
 
 } // namespace core

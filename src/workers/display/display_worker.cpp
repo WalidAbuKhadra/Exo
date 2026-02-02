@@ -54,14 +54,18 @@ void DisplayWorker::Run(std::atomic<bool> &running) {
 
     if (m_nvARPoseHybridBufferPeekSlot) {
 
-      auto poses = m_calibrationApriltagDetector.GetEigenIsometry3fPosesAprilTag();
+      auto tags = m_calibrationApriltagDetector.GetEigenIsometry3fPosesAprilTag();
 
       const auto &confidence = m_nvARPoseHybridBufferPeekSlot->keypointsConfidence;
+      auto skeletonMap = AsEigenMap(m_nvARPoseHybridBufferPeekSlot->keypoints3D) * 0.001f;
 
-      if (poses && !poses->empty()) {
-        draw::DrawSkeletonPerspectiveProjection::Draw3DInversed(AsEigenMap(m_nvARPoseHybridBufferPeekSlot->keypoints3D) * 0.001f, confidence, m_nvConfig, "Exo - 3D Preview", m_focalLength, AsEigenMap(ApplyPoseToEigen(AsEigenMap(m_tagObjPoints), poses->at(0))));
+      if (tags && !tags->empty()) {
+        const auto &firstTagTransform = tags->at(0).transform;
+        core::ApplyPoseToEigen(AsEigenMap(m_tagObjPoints), firstTagTransform, m_tagCornersBuffer);
+
+        draw::DrawSkeletonPerspectiveProjection::Draw3D(skeletonMap, confidence, m_nvConfig, "Exo - 3D Preview", m_focalLength, AsEigenMap(m_tagCornersBuffer));
       } else {
-        draw::DrawSkeletonPerspectiveProjection::Draw3DInversed(AsEigenMap(m_nvARPoseHybridBufferPeekSlot->keypoints3D) * 0.001f, confidence, m_nvConfig, "Exo - 3D Preview", m_focalLength);
+        draw::DrawSkeletonPerspectiveProjection::Draw3D(skeletonMap, confidence, m_nvConfig, "Exo - 3D Preview", m_focalLength);
       }
     }
 

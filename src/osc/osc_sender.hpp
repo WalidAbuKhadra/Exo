@@ -1,6 +1,6 @@
 #pragma once
 
-#define GLM_ENABLE_EXPERIMENTAL
+#include "core/types.hpp"
 #include "osc_config.hpp"
 
 #include <Eigen/src/Core/Matrix.h>
@@ -12,23 +12,18 @@
 
 namespace osc {
 
-struct TrackerMap {
-  int trackerID;
-  int jointIndex;
-};
-
 class OscSender {
 public:
   OscSender(OscConfig &oscCfg);
 
-  void SendJoint(const Eigen::Ref<const Eigen::Matrix3Xf> &points);
+  void SendSkeleton(const Eigen::Ref<const Eigen::Matrix3Xf> &points, const Eigen::Ref<const Eigen::Matrix4Xf> &rotations, const std::vector<float> &confidences);
+
+  void SendTags(const std::vector<core::TagData> &tags);
 
 private:
   std::unique_ptr<UdpTransmitSocket> m_socket;
   std::vector<char> m_buffer;
   std::unique_ptr<osc::OutboundPacketStream> m_packetStream;
-
-  std::vector<TrackerMap> m_mappings;
 };
 
 } // namespace osc

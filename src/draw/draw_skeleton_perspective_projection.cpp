@@ -15,12 +15,12 @@
 
 namespace draw {
 
-void DrawSkeletonPerspectiveProjection::Draw3DInversed(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength) {
+void DrawSkeletonPerspectiveProjection::Draw3D(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength) {
   Eigen::Matrix3Xf emptyMatrix(3, 0);
-  Draw3DInversed(kpts3D, confidence, nvConfig, canvasName, focalLength, emptyMatrix);
+  Draw3D(kpts3D, confidence, nvConfig, canvasName, focalLength, emptyMatrix);
 }
 
-void DrawSkeletonPerspectiveProjection::Draw3DInversed(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength, const Eigen::Ref<const Eigen::Matrix3Xf> &tagKpts3D) {
+void DrawSkeletonPerspectiveProjection::Draw3D(const Eigen::Ref<const Eigen::Matrix3Xf> &kpts3D, const std::vector<float> &confidence, const engines::nvidia::NvidiaConfig &nvConfig, const char *canvasName, double focalLength, const Eigen::Ref<const Eigen::Matrix3Xf> &tagKpts3D) {
 
   if (kpts3D.cols() == 0) {
     return;
